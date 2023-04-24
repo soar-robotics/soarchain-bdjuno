@@ -36,3 +36,11 @@ func (db *Db) InsertEnableModules(modules []string) error {
 
 	return nil
 }
+
+// CreateSchemaInsideDatabase allows to create schema from bdjuno/database/schema 
+// SQL files inside the database
+func (db *Db) CreateSchemaInsideDatabase() error {
+	// TO DO
+
+	return nil
+}
