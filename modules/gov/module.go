@@ -2,6 +2,7 @@ package gov
 
 import (
 	"github.com/cosmos/cosmos-sdk/codec"
+	"github.com/forbole/juno/v4/node"
 
 	"github.com/forbole/bdjuno/v4/database"
 
@@ -27,6 +28,7 @@ type Module struct {
 	mintModule     MintModule
 	slashingModule SlashingModule
 	stakingModule  StakingModule
+	node           node.Node
 }
 
 // NewModule returns a new Module instance
@@ -39,6 +41,7 @@ func NewModule(
 	stakingModule StakingModule,
 	cdc codec.Codec,
 	db *database.Db,
+	node node.Node,
 ) *Module {
 	return &Module{
 		cdc:            cdc,
@@ -49,6 +52,7 @@ func NewModule(
 		slashingModule: slashingModule,
 		stakingModule:  stakingModule,
 		db:             db,
+		node:           node,
 	}
 }
 

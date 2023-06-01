@@ -35,6 +35,13 @@ func (m *Module) HandleMsg(index int, msg sdk.Msg, tx *juno.Tx) error {
 
 // handleMsgSubmitProposal allows to properly handle a handleMsgSubmitProposal
 func (m *Module) handleMsgSubmitProposal(tx *juno.Tx, index int, msg *govtypes.MsgSubmitProposal) error {
+
+	//get the latest height
+	// Update the proposal to the latest status
+	// latestBlock, err := m.node.LatestHeight()
+	// if err != nil {
+	// 	return fmt.Errorf("error while getting latest block: %s", err)
+	// }
 	// Get the proposal id
 	event, err := tx.FindEventByType(index, govtypes.EventTypeSubmitProposal)
 	if err != nil {
@@ -51,10 +58,21 @@ func (m *Module) handleMsgSubmitProposal(tx *juno.Tx, index int, msg *govtypes.M
 		return fmt.Errorf("error while parsing proposal id: %s", err)
 	}
 
+	// var proposal govtypesv1beta1.Proposal
+	var proposal govtypes.Proposal
 	// Get the proposal
-	proposal, err := m.source.Proposal(tx.Height, proposalID)
+	proposal, err = m.source.Proposal(tx.Height, proposalID)
 	if err != nil {
-		return fmt.Errorf("error while getting proposal: %s", err)
+		// try the latest height
+		latestBlock, err := m.node.LatestHeight()
+		if err != nil {
+			return fmt.Errorf("error while getting latest block: %s", err)
+		}
+		proposal, err = m.source.Proposal(latestBlock, proposalID)
+		if err != nil {
+			return fmt.Errorf("error while getting proposal details: %s", err)
+		}
+
 	}
 
 	// Store the proposal
