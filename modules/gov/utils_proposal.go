@@ -304,3 +304,11 @@ func (m *Module) handlePassedProposal(proposal govtypesv1beta1.Proposal, height 
 	}
 	return nil
 }
+
+func (m *Module) SaveDepositsInDB(deposits []types.Deposit) error {
+	err := m.db.SaveDeposits(deposits)
+	if err != nil {
+		return fmt.Errorf("error while saving deposit: %s", err)
+	}
+	return nil
+}
