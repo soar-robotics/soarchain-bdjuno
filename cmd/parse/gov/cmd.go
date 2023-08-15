@@ -14,7 +14,8 @@ func NewGovCmd(parseConfig *parsecmdtypes.Config) *cobra.Command {
 
 	cmd.AddCommand(
 		proposalCmd(parseConfig),
-		depositCmd(parseConfig),
+		proposalVotesCmd(parseConfig),
+		proposalDepositsCmd(parseConfig),
 	)
 
 	return cmd
