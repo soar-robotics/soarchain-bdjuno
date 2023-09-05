@@ -6,6 +6,7 @@ import (
 	sdk "github.com/cosmos/cosmos-sdk/types"
 
 	govtypes "github.com/cosmos/cosmos-sdk/x/gov/types"
+	stakingtypes "github.com/cosmos/cosmos-sdk/x/staking/types"
 )
 
 const (
@@ -260,7 +261,7 @@ type ProposalValidatorStatusSnapshot struct {
 	ProposalID           uint64
 	ValidatorConsAddress string
 	ValidatorVotingPower int64
-	ValidatorStatus      int
+	ValidatorStatus      stakingtypes.BondStatus
 	ValidatorJailed      bool
 	Height               int64
 }
@@ -270,7 +271,7 @@ func NewProposalValidatorStatusSnapshot(
 	proposalID uint64,
 	validatorConsAddr string,
 	validatorVotingPower int64,
-	validatorStatus int,
+	validatorStatus stakingtypes.BondStatus,
 	validatorJailed bool,
 	height int64,
 ) ProposalValidatorStatusSnapshot {

@@ -217,16 +217,6 @@ func (m *Module) updateProposalValidatorStatusesSnapshot(
 		return fmt.Errorf("error while getting validators with bonded status: %s", err)
 	}
 
-	votingPowers, err := m.stakingModule.GetValidatorsVotingPowers(height, blockVals)
-	if err != nil {
-		return fmt.Errorf("error while getting validators voting powers: %s", err)
-	}
-
-	statuses, err := m.stakingModule.GetValidatorsStatuses(height, validators)
-	if err != nil {
-		return fmt.Errorf("error while getting validator statuses: %s", err)
-	}
-
 	var snapshots = make([]types.ProposalValidatorStatusSnapshot, len(validators))
 	for index, validator := range validators {
 		consAddr, err := validator.GetConsAddr()
@@ -234,45 +224,17 @@ func (m *Module) updateProposalValidatorStatusesSnapshot(
 			return err
 		}
 
-		status, err := findStatus(consAddr.String(), statuses)
-		if err != nil {
-			return fmt.Errorf("error while searching for status: %s", err)
-		}
-
-		votingPower, err := findVotingPower(consAddr.String(), votingPowers)
-		if err != nil {
-			return fmt.Errorf("error while searching for voting power: %s", err)
-		}
-
 		snapshots[index] = types.NewProposalValidatorStatusSnapshot(
 			proposalID,
 			consAddr.String(),
-			votingPower.VotingPower,
-			status.Status,
-			status.Jailed,
+			validator.Tokens.Int64(),
+			validator.Status,
+			validator.Jailed,
 			height,
 		)
 	}
 
 	return m.db.SaveProposalValidatorsStatusesSnapshots(snapshots)
-}
-
-func findVotingPower(consAddr string, powers []types.ValidatorVotingPower) (types.ValidatorVotingPower, error) {
-	for _, votingPower := range powers {
-		if votingPower.ConsensusAddress == consAddr {
-			return votingPower, nil
-		}
-	}
-	return types.ValidatorVotingPower{}, fmt.Errorf("voting power not found for validator with consensus address %s", consAddr)
-}
-
-func findStatus(consAddr string, statuses []types.ValidatorStatus) (types.ValidatorStatus, error) {
-	for _, status := range statuses {
-		if status.ConsensusAddress == consAddr {
-			return status, nil
-		}
-	}
-	return types.ValidatorStatus{}, fmt.Errorf("cannot find status for validator with consensus address %s", consAddr)
 }
 
 func (m *Module) handlePassedProposal(proposal govtypes.Proposal, height int64) error {
