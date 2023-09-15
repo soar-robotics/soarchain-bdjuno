@@ -6,12 +6,12 @@ import (
 	"time"
 
 	minttypes "github.com/osmosis-labs/osmosis/v16/x/mint/types"
+	"github.com/rs/zerolog/log"
 
 	proposaltypes "github.com/cosmos/cosmos-sdk/x/params/types/proposal"
 	slashingtypes "github.com/cosmos/cosmos-sdk/x/slashing/types"
 	stakingtypes "github.com/cosmos/cosmos-sdk/x/staking/types"
 	upgradetypes "github.com/cosmos/cosmos-sdk/x/upgrade/types"
-	tmctypes "github.com/tendermint/tendermint/rpc/core/types"
 
 	"google.golang.org/grpc/codes"
 
@@ -22,7 +22,7 @@ import (
 	govtypes "github.com/cosmos/cosmos-sdk/x/gov/types"
 )
 
-func (m *Module) UpdateProposal(height int64, blockTime time.Time, id uint64) error {
+func (m *Module) UpdateProposalStatus(height int64, blockTime time.Time, id uint64) error {
 	// Get the proposal
 	proposal, err := m.source.Proposal(height, id)
 	if err != nil {
@@ -42,16 +42,6 @@ func (m *Module) UpdateProposal(height int64, blockTime time.Time, id uint64) er
 		return fmt.Errorf("error while updating proposal status: %s", err)
 	}
 
-	err = m.updateProposalTallyResult(proposal)
-	if err != nil {
-		return fmt.Errorf("error while updating proposal tally result: %s", err)
-	}
-
-	err = m.updateAccounts(proposal)
-	if err != nil {
-		return fmt.Errorf("error while updating account: %s", err)
-	}
-
 	err = m.handlePassedProposal(proposal, height)
 	if err != nil {
 		return fmt.Errorf("error while handling passed proposals: %s", err)
@@ -60,22 +50,56 @@ func (m *Module) UpdateProposal(height int64, blockTime time.Time, id uint64) er
 	return nil
 }
 
-func (m *Module) UpdateProposalValidatorStatusesSnapshot(height int64, blockVals *tmctypes.ResultValidators, id uint64) error {
-	err := m.updateProposalValidatorStatusesSnapshot(height, id, blockVals)
+// updateProposalStatus updates given proposal status
+func (m *Module) updateProposalStatus(proposal govtypes.Proposal) error {
+	return m.db.UpdateProposal(
+		types.NewProposalUpdate(
+			proposal.ProposalId,
+			proposal.Status.String(),
+			proposal.VotingStartTime,
+			proposal.VotingEndTime,
+		),
+	)
+}
+
+func (m *Module) UpdateProposalsStakingPoolSnapshot() error {
+	blockTime, err := m.db.GetLastBlockTimestamp()
 	if err != nil {
-		return fmt.Errorf("error while updating proposal validator statuses snapshot: %s", err)
+		return err
+	}
+
+	ids, err := m.db.GetOpenProposalsIds(blockTime)
+	if err != nil {
+		log.Error().Err(err).Str("module", "gov").Msg("error while getting open proposals ids")
+	}
+
+	// Get the latest block height from db
+	height, err := m.db.GetLastBlockHeight()
+	if err != nil {
+		return fmt.Errorf("error while getting latest block height from db: %s", err)
+	}
+
+	for _, proposalID := range ids {
+		err = m.UpdateProposalStakingPoolSnapshot(height, proposalID)
+		if err != nil {
+			return fmt.Errorf("error while updating proposal %d staking pool snapshots: %s", proposalID, err)
+		}
 	}
 
 	return nil
 }
 
-func (m *Module) UpdateProposalStakingPoolSnapshot(height int64, blockVals *tmctypes.ResultValidators, id uint64) error {
-	err := m.updateProposalStakingPoolSnapshot(height, id)
+// UpdateProposalStakingPoolSnapshot updates the staking pool snapshot associated with the gov
+// proposal having the provided id
+func (m *Module) UpdateProposalStakingPoolSnapshot(height int64, proposalID uint64) error {
+	pool, err := m.stakingModule.GetStakingPoolSnapshot(height)
 	if err != nil {
-		return fmt.Errorf("error while updating proposal staking pool snapshot: %s", err)
+		return fmt.Errorf("error while getting staking pool: %s", err)
 	}
 
-	return nil
+	return m.db.SaveProposalStakingPoolSnapshot(
+		types.NewProposalStakingPoolSnapshot(proposalID, pool),
+	)
 }
 
 // updateDeletedProposalStatus updates the proposal having the given id by setting its status
@@ -137,33 +161,43 @@ func (m *Module) handleParamChangeProposal(height int64, paramChangeProposal *pr
 	return nil
 }
 
-// updateProposalStatus updates the given proposal status
-func (m *Module) updateProposalStatus(proposal govtypes.Proposal) error {
-	return m.db.UpdateProposal(
-		types.NewProposalUpdate(
-			proposal.ProposalId,
-			proposal.Status.String(),
-			proposal.VotingStartTime,
-			proposal.VotingEndTime,
-		),
-	)
-}
+// UpdateProposalTallyResults updates the tally for active proposals
+func (m *Module) UpdateProposalTallyResults() error {
+	blockTime, err := m.db.GetLastBlockTimestamp()
+	if err != nil {
+		return err
+	}
 
-// updateProposalTallyResult updates the tally result associated with the given proposal
-func (m *Module) updateProposalTallyResult(proposal govtypes.Proposal) error {
+	ids, err := m.db.GetOpenProposalsIds(blockTime)
+	if err != nil {
+		log.Error().Err(err).Str("module", "gov").Msg("error while getting open proposals ids")
+	}
+
 	height, err := m.db.GetLastBlockHeight()
 	if err != nil {
 		return err
 	}
 
-	result, err := m.source.TallyResult(height, proposal.ProposalId)
+	for _, proposalID := range ids {
+		err = m.UpdateProposalTallyResult(proposalID, height)
+		if err != nil {
+			return fmt.Errorf("error while updating proposal %d tally result : %s", proposalID, err)
+		}
+	}
+
+	return nil
+}
+
+// UpdateProposalTallyResult updates the tally result associated with the given proposal ID
+func (m *Module) UpdateProposalTallyResult(proposalID uint64, height int64) error {
+	result, err := m.source.TallyResult(height, proposalID)
 	if err != nil {
 		return fmt.Errorf("error while getting tally result: %s", err)
 	}
 
 	return m.db.SaveTallyResults([]types.TallyResult{
 		types.NewTallyResult(
-			proposal.ProposalId,
+			proposalID,
 			result.Yes.String(),
 			result.Abstain.String(),
 			result.No.String(),
@@ -171,70 +205,6 @@ func (m *Module) updateProposalTallyResult(proposal govtypes.Proposal) error {
 			height,
 		),
 	})
-}
-
-// updateAccounts updates any account that might be involved in the proposal (eg. fund community recipient)
-func (m *Module) updateAccounts(proposal govtypes.Proposal) error {
-	content, ok := proposal.Content.GetCachedValue().(*distrtypes.CommunityPoolSpendProposal)
-	if ok {
-		height, err := m.db.GetLastBlockHeight()
-		if err != nil {
-			return fmt.Errorf("error while getting last block height: %s", err)
-		}
-
-		addresses := []string{content.Recipient}
-
-		err = m.authModule.RefreshAccounts(height, addresses)
-		if err != nil {
-			return err
-		}
-
-		return nil
-	}
-	return nil
-}
-
-// updateProposalStakingPoolSnapshot updates the staking pool snapshot associated with the gov
-// proposal having the provided id
-func (m *Module) updateProposalStakingPoolSnapshot(height int64, proposalID uint64) error {
-	pool, err := m.stakingModule.GetStakingPoolSnapshot(height)
-	if err != nil {
-		return fmt.Errorf("error while getting staking pool: %s", err)
-	}
-
-	return m.db.SaveProposalStakingPoolSnapshot(
-		types.NewProposalStakingPoolSnapshot(proposalID, pool),
-	)
-}
-
-// updateProposalValidatorStatusesSnapshot updates the snapshots of the various validators for
-// the proposal having the given id
-func (m *Module) updateProposalValidatorStatusesSnapshot(
-	height int64, proposalID uint64, blockVals *tmctypes.ResultValidators,
-) error {
-	validators, _, err := m.stakingModule.GetValidatorsWithStatus(height, stakingtypes.Bonded.String())
-	if err != nil {
-		return fmt.Errorf("error while getting validators with bonded status: %s", err)
-	}
-
-	var snapshots = make([]types.ProposalValidatorStatusSnapshot, len(validators))
-	for index, validator := range validators {
-		consAddr, err := validator.GetConsAddr()
-		if err != nil {
-			return err
-		}
-
-		snapshots[index] = types.NewProposalValidatorStatusSnapshot(
-			proposalID,
-			consAddr.String(),
-			validator.Tokens.Int64(),
-			validator.Status,
-			validator.Jailed,
-			height,
-		)
-	}
-
-	return m.db.SaveProposalValidatorsStatusesSnapshots(snapshots)
 }
 
 func (m *Module) handlePassedProposal(proposal govtypes.Proposal, height int64) error {
