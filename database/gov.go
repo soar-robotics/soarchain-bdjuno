@@ -57,7 +57,7 @@ func (db *Db) GetGovParams() (*types.GovParams, error) {
 	var rows []dbtypes.GovParamsRow
 	err := db.Sqlx.Select(&rows, `SELECT * FROM gov_params`)
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("error while getting gov params from db: %s", err)
 	}
 
 	if len(rows) == 0 {
@@ -69,19 +69,19 @@ func (db *Db) GetGovParams() (*types.GovParams, error) {
 	var depositParams types.DepositParams
 	err = json.Unmarshal([]byte(row.DepositParams), &depositParams)
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("error while unmarshaling gov deposit params: %s", err)
 	}
 
 	var votingParams types.VotingParams
 	err = json.Unmarshal([]byte(row.VotingParams), &votingParams)
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("error while unmarshaling gov voting params: %s", err)
 	}
 
 	var tallyParams types.TallyParams
 	err = json.Unmarshal([]byte(row.TallyParams), &tallyParams)
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("error while unmarshaling gov tally params: %s", err)
 	}
 
 	return types.NewGovParams(
@@ -119,17 +119,17 @@ INSERT INTO proposal(
 		// Encode the content properly
 		protoContent, ok := proposal.Content.(proto.Message)
 		if !ok {
-			return fmt.Errorf("invalid proposal content types: %T", proposal.Content)
+			return fmt.Errorf("invalid proposal content types for proposal %d: %T", proposal.ProposalID, proposal.Content)
 		}
 
 		anyContent, err := codectypes.NewAnyWithValue(protoContent)
 		if err != nil {
-			return fmt.Errorf("error while wrapping proposal proto content: %s", err)
+			return fmt.Errorf("error while wrapping proposal %d proto content: %s", proposal.ProposalID, err)
 		}
 
 		contentBz, err := db.Cdc.MarshalJSON(anyContent)
 		if err != nil {
-			return fmt.Errorf("error while marshaling proposal content: %s", err)
+			return fmt.Errorf("error while marshaling proposal %d content: %s", proposal.ProposalID, err)
 		}
 
 		proposalsParams = append(proposalsParams,
@@ -182,7 +182,7 @@ func (db *Db) GetProposal(id uint64) (*types.Proposal, error) {
 	var rows []*dbtypes.ProposalRow
 	err := db.Sqlx.Select(&rows, `SELECT * FROM proposal WHERE id = $1`, id)
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("error while getting proposal %d: %s", id, err)
 	}
 
 	if len(rows) == 0 {
@@ -194,13 +194,13 @@ func (db *Db) GetProposal(id uint64) (*types.Proposal, error) {
 	var contentAny codectypes.Any
 	err = db.Cdc.UnmarshalJSON([]byte(row.Content), &contentAny)
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("error while unmarshaling proposal %d content: %s", id, err)
 	}
 
 	var content govtypes.Content
 	err = db.Cdc.UnpackAny(&contentAny, &content)
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("error while unpacking proposal %d content: %s", id, err)
 	}
 
 	proposal := types.NewProposal(
@@ -248,7 +248,7 @@ func (db *Db) UpdateProposal(update types.ProposalUpdate) error {
 		update.ProposalID,
 	)
 	if err != nil {
-		return fmt.Errorf("error while updating proposal: %s", err)
+		return fmt.Errorf("error while updating proposal %d: %s", update.ProposalID, err)
 	}
 
 	return nil
@@ -309,7 +309,7 @@ WHERE proposal_vote.height <= excluded.height`
 
 	_, err = db.SQL.Exec(query, vote.ProposalID, vote.Voter, vote.Option.String(), vote.Timestamp, vote.Height)
 	if err != nil {
-		return fmt.Errorf("error while storing vote: %s", err)
+		return fmt.Errorf("error while storing vote for proposal %d: %s", vote.ProposalID, err)
 	}
 
 	return nil
@@ -370,7 +370,7 @@ WHERE proposal_staking_pool_snapshot.height <= excluded.height`
 	_, err := db.SQL.Exec(stmt,
 		snapshot.ProposalID, snapshot.Pool.BondedTokens.String(), snapshot.Pool.NotBondedTokens.String(), snapshot.Pool.Height)
 	if err != nil {
-		return fmt.Errorf("error while storing proposal staking pool snapshot: %s", err)
+		return fmt.Errorf("error while storing proposal staking pool snapshot for proposal %d: %s", snapshot.ProposalID, err)
 	}
 
 	return nil
@@ -408,7 +408,7 @@ ON CONFLICT ON CONSTRAINT unique_validator_status_snapshot DO UPDATE
 WHERE proposal_validator_status_snapshot.height <= excluded.height`
 	_, err := db.SQL.Exec(stmt, args...)
 	if err != nil {
-		return fmt.Errorf("error while storing proposal validator statuses snapshot: %s", err)
+		return fmt.Errorf("error while storing proposal validator statuses snapshots: %s", err)
 	}
 
 	return nil
@@ -430,7 +430,7 @@ WHERE software_upgrade_plan.height <= excluded.height`
 	_, err := db.SQL.Exec(stmt,
 		proposalID, plan.Name, plan.Height, plan.Info, height)
 	if err != nil {
-		return fmt.Errorf("error while storing software upgrade plan: %s", err)
+		return fmt.Errorf("error while storing software upgrade plan for proposal %d: %s", proposalID, err)
 	}
 
 	return nil
@@ -442,7 +442,7 @@ func (db *Db) DeleteSoftwareUpgradePlan(proposalID uint64) error {
 
 	_, err := db.SQL.Exec(stmt, proposalID)
 	if err != nil {
-		return fmt.Errorf("error while deleting software upgrade plan: %s", err)
+		return fmt.Errorf("error while deleting software upgrade plan for proposal %d: %s", proposalID, err)
 	}
 
 	return nil
