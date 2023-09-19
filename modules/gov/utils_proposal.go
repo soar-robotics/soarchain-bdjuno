@@ -63,6 +63,7 @@ func (m *Module) updateProposalStatus(proposal govtypes.Proposal) error {
 }
 
 func (m *Module) UpdateProposalsStakingPoolSnapshot() error {
+	log.Debug().Str("module", "gov").Msg("refreshing proposal staking pool snapshots")
 	blockTime, err := m.db.GetLastBlockTimestamp()
 	if err != nil {
 		return err
@@ -161,8 +162,9 @@ func (m *Module) handleParamChangeProposal(height int64, paramChangeProposal *pr
 	return nil
 }
 
-// UpdateProposalTallyResults updates the tally for active proposals
-func (m *Module) UpdateProposalTallyResults() error {
+// UpdateAllActiveProposalsTallyResults updates the tally for active proposals
+func (m *Module) UpdateAllActiveProposalsTallyResults() error {
+	log.Debug().Str("module", "gov").Msg("refreshing proposal tally results")
 	blockTime, err := m.db.GetLastBlockTimestamp()
 	if err != nil {
 		return err
