@@ -20,7 +20,7 @@ import (
 
 func (suite *DbTestSuite) TestBigDipperDb_SaveGovParams() {
 	votingParams := govtypes.NewVotingParams(time.Second*10, time.Second*10, []govtypes.ProposalVotingPeriod{})
-	tallyParams := govtypes.NewTallyParams(sdk.NewDec(10), sdk.NewDec(10), sdk.NewDec(10), sdk.NewDec(10))
+	tallyParams := govtypes.NewTallyParams(sdk.NewDec(10), sdk.NewDec(10), sdk.NewDec(10), sdk.NewDec(10), sdk.NewDec(10))
 	depositParams := govtypes.NewDepositParams(sdk.NewCoins(sdk.NewCoin("uatom", sdk.NewInt(10))), time.Minute*5, sdk.NewCoins(sdk.NewCoin("uatom", sdk.NewInt(10))))
 	original := types.NewGovParams(types.NewVotingParams(votingParams), types.NewDepositParam(depositParams), types.NewTallyParams(tallyParams), 10)
 
@@ -56,7 +56,7 @@ func (suite *DbTestSuite) TestBigDipperDb_SaveGovParams() {
 
 	// ----------------------------------------------------------------------------------------------------------------
 	// Try updating with a higher height
-	tallyParams = govtypes.NewTallyParams(sdk.NewDec(100), sdk.NewDec(100), sdk.NewDec(100), sdk.NewDec(100))
+	tallyParams = govtypes.NewTallyParams(sdk.NewDec(100), sdk.NewDec(100), sdk.NewDec(100), sdk.NewDec(100), sdk.NewDec(100))
 	depositParams = govtypes.NewDepositParams(sdk.NewCoins(sdk.NewCoin("udesmos", sdk.NewInt(10000))), time.Minute*5, sdk.NewCoins(sdk.NewCoin("uatom", sdk.NewInt(10))))
 	updated = types.NewGovParams(types.NewVotingParams(votingParams), types.NewDepositParam(depositParams), types.NewTallyParams(tallyParams), 11)
 
@@ -104,7 +104,7 @@ func (suite *DbTestSuite) encodeProposalContent(content govtypes.Content) string
 	anyContent, err := codectypes.NewAnyWithValue(protoContent)
 	suite.Require().NoError(err)
 
-	contentBz, err := suite.database.EncodingConfig.Marshaler.MarshalJSON(anyContent)
+	contentBz, err := suite.database.Cdc.MarshalJSON(anyContent)
 	suite.Require().NoError(err)
 
 	return string(contentBz)
@@ -376,13 +376,12 @@ func (suite *DbTestSuite) TestBigDipperDb_SaveDeposits() {
 	// ----------------------------------------------------------------------------------------------------------------
 	// Update values
 
-	amount = sdk.NewCoins(sdk.NewCoin("desmos", sdk.NewInt(10)))
-	amount2 = sdk.NewCoins(sdk.NewCoin("desmos", sdk.NewInt(20)))
+	// amount2 = sdk.NewCoins(sdk.NewCoin("desmos", sdk.NewInt(20)))
 	amount3 = sdk.NewCoins(sdk.NewCoin("desmos", sdk.NewInt(30)))
 
 	deposit = []types.Deposit{
 		types.NewDeposit(proposal.ProposalID, depositor.String(), amount, timestamp1, 9),
-		types.NewDeposit(proposal.ProposalID, depositor2.String(), amount2, timestamp2, 10),
+		types.NewDeposit(proposal.ProposalID, depositor2.String(), amount2, timestamp2, 11),
 		types.NewDeposit(proposal.ProposalID, depositor3.String(), amount3, timestamp3, 11),
 	}
 
@@ -390,9 +389,10 @@ func (suite *DbTestSuite) TestBigDipperDb_SaveDeposits() {
 	suite.Require().NoError(err)
 
 	expected = []dbtypes.DepositRow{
-		dbtypes.NewDepositRow(1, depositor.String(), dbtypes.NewDbCoins(
-			sdk.NewCoins(sdk.NewCoin("desmos", sdk.NewInt(10000)))), timestamp1, 10),
-		dbtypes.NewDepositRow(1, depositor2.String(), dbtypes.NewDbCoins(amount2), timestamp2, 10),
+		dbtypes.NewDepositRow(1, depositor.String(), dbtypes.NewDbCoins(amount), timestamp1, 10),
+		dbtypes.NewDepositRow(1, depositor3.String(), dbtypes.NewDbCoins(
+			sdk.NewCoins(sdk.NewCoin("desmos", sdk.NewInt(50000)))), timestamp3, 10),
+		dbtypes.NewDepositRow(1, depositor2.String(), dbtypes.NewDbCoins(amount2), timestamp2, 11),
 		dbtypes.NewDepositRow(1, depositor3.String(), dbtypes.NewDbCoins(amount3), timestamp3, 11),
 	}
 
@@ -636,7 +636,7 @@ func (suite *DbTestSuite) TestBigDipperDb_SaveProposalValidatorsStatusesSnapshot
 			1,
 			validator1.GetConsAddr(),
 			100,
-			int(stakingtypes.Bonded),
+			stakingtypes.Bonded,
 			false,
 			10,
 		),
@@ -644,7 +644,7 @@ func (suite *DbTestSuite) TestBigDipperDb_SaveProposalValidatorsStatusesSnapshot
 			1,
 			validator2.GetConsAddr(),
 			100,
-			int(stakingtypes.Unbonding),
+			stakingtypes.Unbonding,
 			true,
 			10,
 		),
@@ -685,7 +685,7 @@ func (suite *DbTestSuite) TestBigDipperDb_SaveProposalValidatorsStatusesSnapshot
 			1,
 			validator1.GetConsAddr(),
 			10,
-			int(stakingtypes.Bonded),
+			stakingtypes.Bonded,
 			true,
 			9,
 		),
@@ -693,7 +693,7 @@ func (suite *DbTestSuite) TestBigDipperDb_SaveProposalValidatorsStatusesSnapshot
 			1,
 			validator2.GetConsAddr(),
 			700,
-			int(stakingtypes.Unbonding),
+			stakingtypes.Unbonding,
 			true,
 			9,
 		),
@@ -734,7 +734,7 @@ func (suite *DbTestSuite) TestBigDipperDb_SaveProposalValidatorsStatusesSnapshot
 			1,
 			validator1.GetConsAddr(),
 			10,
-			int(stakingtypes.Bonded),
+			stakingtypes.Bonded,
 			true,
 			10,
 		),
@@ -742,7 +742,7 @@ func (suite *DbTestSuite) TestBigDipperDb_SaveProposalValidatorsStatusesSnapshot
 			1,
 			validator2.GetConsAddr(),
 			700,
-			int(stakingtypes.Unbonding),
+			stakingtypes.Unbonding,
 			true,
 			10,
 		),
@@ -783,7 +783,7 @@ func (suite *DbTestSuite) TestBigDipperDb_SaveProposalValidatorsStatusesSnapshot
 			1,
 			validator1.GetConsAddr(),
 			100000,
-			int(stakingtypes.Unspecified),
+			stakingtypes.Unspecified,
 			false,
 			11,
 		),
@@ -791,7 +791,7 @@ func (suite *DbTestSuite) TestBigDipperDb_SaveProposalValidatorsStatusesSnapshot
 			1,
 			validator2.GetConsAddr(),
 			700000,
-			int(stakingtypes.Unbonded),
+			stakingtypes.Unbonded,
 			false,
 			11,
 		),
