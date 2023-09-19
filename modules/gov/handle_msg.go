@@ -126,5 +126,11 @@ func (m *Module) handleMsgVote(tx *juno.Tx, msg *govtypes.MsgVote) error {
 
 	vote := types.NewVote(msg.ProposalId, msg.Voter, msg.Option, txTimestamp, tx.Height)
 
-	return m.db.SaveVote(vote)
+	err = m.db.SaveVote(vote)
+	if err != nil {
+		return fmt.Errorf("error while saving vote: %s", err)
+	}
+
+	// update tally result for given proposal
+	return m.UpdateProposalTallyResult(msg.ProposalId, tx.Height)
 }
