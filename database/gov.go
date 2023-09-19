@@ -148,7 +148,7 @@ INSERT INTO proposal(
 		)
 	}
 
-	// Store the accounts
+	// Store the proposers accounts
 	err := db.SaveAccounts(accounts)
 	if err != nil {
 		return fmt.Errorf("error while storing proposers accounts: %s", err)
@@ -260,11 +260,16 @@ func (db *Db) SaveDeposits(deposits []types.Deposit) error {
 		return nil
 	}
 
+	var accounts []types.Account
+
 	query := `INSERT INTO proposal_deposit (proposal_id, depositor_address, amount, timestamp, height) VALUES `
 	var param []interface{}
 
 	for i, deposit := range deposits {
 		vi := i * 5
+
+		accounts = append(accounts, types.NewAccount(deposit.Depositor))
+
 		query += fmt.Sprintf("($%d,$%d,$%d,$%d,$%d),", vi+1, vi+2, vi+3, vi+4, vi+5)
 		param = append(param, deposit.ProposalID,
 			deposit.Depositor,
@@ -273,13 +278,20 @@ func (db *Db) SaveDeposits(deposits []types.Deposit) error {
 			deposit.Height,
 		)
 	}
+
+	// Store depositors accounts
+	err := db.SaveAccounts(accounts)
+	if err != nil {
+		return fmt.Errorf("error while storing depositors accounts: %s", err)
+	}
+
 	query = query[:len(query)-1] // Remove trailing ","
 	query += `
 ON CONFLICT ON CONSTRAINT unique_deposit DO UPDATE
 	SET timestamp = excluded.timestamp,
 		height = excluded.height
 WHERE proposal_deposit.height <= excluded.height`
-	_, err := db.SQL.Exec(query, param...)
+	_, err = db.SQL.Exec(query, param...)
 	if err != nil {
 		return fmt.Errorf("error while storing deposits: %s", err)
 	}
