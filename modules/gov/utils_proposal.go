@@ -23,7 +23,7 @@ import (
 )
 
 // UpdateProposalStatus queries the latest details of given proposal ID, updates it's status
-// in database and handles changes if the proposal has been passed.
+// in database and handles the changes if the proposal has been passed.
 func (m *Module) UpdateProposalStatus(height int64, blockTime time.Time, id uint64) error {
 	// Get the proposal
 	proposal, err := m.source.Proposal(height, id)
@@ -36,17 +36,17 @@ func (m *Module) UpdateProposalStatus(height int64, blockTime time.Time, id uint
 			return m.updateDeletedProposalStatus(id)
 		}
 
-		return fmt.Errorf("error while getting proposal: %s", err)
+		return fmt.Errorf("error while getting proposal %d: %s", id, err)
 	}
 
 	err = m.updateProposalStatus(proposal)
 	if err != nil {
-		return fmt.Errorf("error while updating proposal status: %s", err)
+		return fmt.Errorf("error while updating proposal %d status: %s", id, err)
 	}
 
 	err = m.handlePassedProposal(proposal, height)
 	if err != nil {
-		return fmt.Errorf("error while handling passed proposals: %s", err)
+		return fmt.Errorf("error while handling passed proposals %d: %s", id, err)
 	}
 
 	return nil
@@ -64,7 +64,7 @@ func (m *Module) updateProposalStatus(proposal govtypes.Proposal) error {
 	)
 }
 
-// UpdateAllActiveProposalsStakingPoolSnapshot updates 
+// UpdateAllActiveProposalsStakingPoolSnapshot updates
 // staking pool snapshots for active proposals
 func (m *Module) UpdateAllActiveProposalsStakingPoolSnapshot() error {
 	log.Debug().Str("module", "gov").Msg("refreshing proposal staking pool snapshots")
