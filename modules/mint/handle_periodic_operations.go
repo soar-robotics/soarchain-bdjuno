@@ -32,17 +32,17 @@ func (m *Module) UpdateInflation() error {
 		Str("operation", "inflation").
 		Msg("getting inflation data")
 
-	height, err := m.db.GetLastBlockHeight()
+	block, err := m.db.GetLastBlockHeightAndTimestamp()
 	if err != nil {
 		return err
 	}
 
-	mintParams, err := m.source.Params(height)
+	mintParams, err := m.source.Params(block.Height)
 	if err != nil {
 		return err
 	}
 
-	epochProvisions, err := m.source.EpochProvisions(height)
+	epochProvisions, err := m.source.EpochProvisions(block.Height)
 	if err != nil {
 		return err
 	}
@@ -62,6 +62,6 @@ func (m *Module) UpdateInflation() error {
 	totalProvisions := new(big.Float).Mul(epochProvisionsFloat, epochPeriod)
 	inflation := new(big.Float).Quo(totalProvisions, new(big.Float).SetInt64(supply))
 
-	return m.db.SaveInflation(inflation.String(), height)
+	return m.db.SaveInflation(inflation.String(), block.Height)
 
 }
