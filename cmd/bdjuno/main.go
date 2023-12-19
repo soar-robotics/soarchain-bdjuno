@@ -1,6 +1,7 @@
 package main
 
 import (
+	soarchain "github.com/amirh39/soarchain-core/app"
 	"github.com/cosmos/cosmos-sdk/types/module"
 	"github.com/forbole/juno/v4/cmd"
 	initcmd "github.com/forbole/juno/v4/cmd/init"
@@ -55,6 +56,7 @@ func main() {
 func getBasicManagers() []module.BasicManager {
 	return []module.BasicManager{
 		simapp.ModuleBasics,
+		soarchain.ModuleBasics,
 	}
 }
 
@@ -64,5 +66,7 @@ func getBasicManagers() []module.BasicManager {
 func getAddressesParser() messages.MessageAddressesParser {
 	return messages.JoinMessageParsers(
 		messages.CosmosMessageAddressesParser,
+		SoarchainAddressesParser
 	)
 }
+
